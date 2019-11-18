@@ -864,7 +864,9 @@ static int const RCTVideoUnset = -1;
     } else if([_ignoreSilentSwitch isEqualToString:@"obey"]) {
       [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryAmbient error:nil];
     }
-    [_player play];
+    if (_paused) {
+      [_player play];
+    }
     [_player setRate:_rate];
   }
   
