@@ -3,6 +3,12 @@ package com.brentvatne.react;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.PictureInPictureParams;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Matrix;
 import android.media.MediaPlayer;
@@ -64,6 +70,7 @@ public class ReactVideoView extends ScalableVideoView implements
         EVENT_STALLED("onPlaybackStalled"),
         EVENT_RESUME("onPlaybackResume"),
         EVENT_READY_FOR_DISPLAY("onReadyForDisplay"),
+        EVENT_PICTURE_IN_PICTURE_STATUS_CHANGED("onPictureInPictureStatusChanged"),
         EVENT_FULLSCREEN_WILL_PRESENT("onVideoFullscreenPlayerWillPresent"),
         EVENT_FULLSCREEN_DID_PRESENT("onVideoFullscreenPlayerDidPresent"),
         EVENT_FULLSCREEN_WILL_DISMISS("onVideoFullscreenPlayerWillDismiss"),
@@ -101,10 +108,14 @@ public class ReactVideoView extends ScalableVideoView implements
     public static final String EVENT_PROP_TARGET = "target";
     public static final String EVENT_PROP_METADATA_IDENTIFIER = "identifier";
     public static final String EVENT_PROP_METADATA_VALUE = "value";
+    private static final String EVENT_PROP_PICTURE_IN_PICTURE_ACTIVE = "isActive";
 
     public static final String EVENT_PROP_ERROR = "error";
     public static final String EVENT_PROP_WHAT = "what";
     public static final String EVENT_PROP_EXTRA = "extra";
+
+    private final BroadcastReceiver pipReceiver;
+    private final BroadcastReceiver leaveReceiver;
 
     private ThemedReactContext mThemedReactContext;
     private RCTEventEmitter mEventEmitter;
@@ -122,6 +133,8 @@ public class ReactVideoView extends ScalableVideoView implements
     private ScalableType mResizeMode = ScalableType.LEFT_TOP;
     private boolean mRepeat = false;
     private boolean mPaused = false;
+    private boolean isInPictureInPictureMode;
+    private boolean showPictureInPictureOnLeave;
     private boolean mMuted = false;
     private boolean mPreventsDisplaySleepDuringVideoPlayback = true;
     private float mVolume = 1.0f;
@@ -170,6 +183,29 @@ public class ReactVideoView extends ScalableVideoView implements
                 }
             }
         };
+
+        final ReactVideoView self = this;
+
+        pipReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                boolean isInPictureInPictureMode = intent.getBooleanExtra("isInPictureInPictureMode", false);
+                self.onPictureInPictureModeChanged(isInPictureInPictureMode);
+            }
+        };
+
+        leaveReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (showPictureInPictureOnLeave) {
+                    self.setPictureInPicture(true);
+                }
+            }
+        };
+
+        Activity activity = themedReactContext.getCurrentActivity();
+        activity.registerReceiver(pipReceiver, new IntentFilter("onPictureInPictureModeChanged"));
+        activity.registerReceiver(leaveReceiver, new IntentFilter("onUserLeaveHint"));
     }
 
     @Override
@@ -729,7 +765,7 @@ public class ReactVideoView extends ScalableVideoView implements
 
     @Override
     public void onHostPause() {
-        if (mMediaPlayerValid && !mPaused && !mPlayInBackground) {
+        if (mMediaPlayerValid && !mPaused && !mPlayInBackground && !showPictureInPictureOnLeave) {
             /* Pause the video in background
              * Don't update the paused prop, developers should be able to update it on background
              *  so that when you return to the app the video is paused
@@ -755,6 +791,15 @@ public class ReactVideoView extends ScalableVideoView implements
 
     @Override
     public void onHostDestroy() {
+        Activity activity = mThemedReactContext.getCurrentActivity();
+        if (activity == null) return;
+        try {
+            activity.unregisterReceiver(pipReceiver);
+            activity.unregisterReceiver(leaveReceiver);
+        } catch (Exception ignore) {
+            // ignore if already unregistered
+        }
+
     }
 
     /**
@@ -792,5 +837,52 @@ public class ReactVideoView extends ScalableVideoView implements
                 }
             }
         } catch (Exception e) {}
+    }
+
+    /**
+     * Handling showPictureInPictureOnLeave prop.
+     *
+     * @param showPictureInPictureOnLeaveProp If true, enter pip mode when pressing home or recent HW button.
+     */
+    public void setShowPictureInPictureOnLeave(boolean showPictureInPictureOnLeaveProp) {
+        showPictureInPictureOnLeave = showPictureInPictureOnLeaveProp;
+    }
+
+    /**
+     * Handling pip prop.
+     *
+     * @param pictureInPicture  Pip prop, if true, enter PIP mode.
+     */
+    public void setPictureInPicture(boolean pictureInPicture) {
+        if (!isInPictureInPictureMode && pictureInPicture) {
+            this.enterPictureInPictureMode();
+        }
+        isInPictureInPictureMode = pictureInPicture;
+    }
+
+    /**
+     * PIP handled, for N devices that support it, not "officially".
+     */
+    public void enterPictureInPictureMode() {
+        PackageManager packageManager = mThemedReactContext.getPackageManager();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+                && packageManager
+                .hasSystemFeature(
+                        PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+            //long videoPosition = mMediaPlayer.getCurrentPosition();
+            Activity activity = mThemedReactContext.getCurrentActivity();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PictureInPictureParams.Builder params = new PictureInPictureParams.Builder();
+                activity.enterPictureInPictureMode(params.build());
+            } else {
+                activity.enterPictureInPictureMode();
+            }
+        }
+    }
+
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode) {
+        WritableMap event = Arguments.createMap();
+        event.putBoolean(EVENT_PROP_PICTURE_IN_PICTURE_ACTIVE, isInPictureInPictureMode);
+        mEventEmitter.receiveEvent(getId(), Events.EVENT_PICTURE_IN_PICTURE_STATUS_CHANGED.toString(), event);
     }
 }
