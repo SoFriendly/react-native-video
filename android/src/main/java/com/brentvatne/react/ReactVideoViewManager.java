@@ -39,6 +39,8 @@ public class ReactVideoViewManager extends SimpleViewManager<ReactVideoView> {
     public static final String PROP_FULLSCREEN = "fullscreen";
     public static final String PROP_PLAY_IN_BACKGROUND = "playInBackground";
     public static final String PROP_CONTROLS = "controls";
+    private static final String PROP_PICTURE_IN_PICTURE = "pictureInPicture";
+    private static final String PROP_SHOW_PICTURE_IN_PICTURE_ON_LEAVE = "showPictureInPictureOnLeave";
 
     @Override
     public String getName() {
@@ -168,5 +170,15 @@ public class ReactVideoViewManager extends SimpleViewManager<ReactVideoView> {
     @ReactProp(name = PROP_CONTROLS, defaultBoolean = false)
     public void setControls(final ReactVideoView videoView, final boolean controls) {
         videoView.setControls(controls);
+    }
+
+    @ReactProp(name = PROP_PICTURE_IN_PICTURE, defaultBoolean = false)
+    public void setPictureInPicture(final ReactVideoView videoView, final boolean pictureInPicture) {
+        videoView.setPictureInPicture(pictureInPicture);
+    }
+
+    @ReactProp(name = PROP_SHOW_PICTURE_IN_PICTURE_ON_LEAVE, defaultBoolean = false)
+    public void setShowPictureInPictureOnLeave(final ReactVideoView videoView, final boolean showPictureInPictureOnLeave) {
+        videoView.setShowPictureInPictureOnLeave(showPictureInPictureOnLeave);
     }
 }
