@@ -201,6 +201,8 @@ class ReactExoplayerView extends FrameLayout implements
         createViews();
 
         audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        //TODO: Change for auto play/pause when call detected.
+        audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
         themedReactContext.addLifecycleEventListener(this);
         audioBecomingNoisyReceiver = new AudioBecomingNoisyReceiver(themedReactContext);
     }
@@ -267,6 +269,8 @@ class ReactExoplayerView extends FrameLayout implements
     @Override
     public void onHostDestroy() {
         stopPlayback();
+        //TODO: Change for auto play/pause when call detected.
+        audioManager.abandonAudioFocus(this);
     }
 
     public void cleanUpResources() {
@@ -567,13 +571,15 @@ class ReactExoplayerView extends FrameLayout implements
     }
 
     private boolean requestAudioFocus() {
-        if (disableFocus || srcUri == null) {
-            return true;
-        }
-        int result = audioManager.requestAudioFocus(this,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN);
-        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+        //TODO: Change for auto play/pause when call detected.
+        return true;
+        // if (disableFocus || srcUri == null) {
+        //     return true;
+        // }
+        // int result = audioManager.requestAudioFocus(this,
+        //         AudioManager.STREAM_MUSIC,
+        //         AudioManager.AUDIOFOCUS_GAIN);
+        // return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
     }
 
     private void setPlayWhenReady(boolean playWhenReady) {
@@ -634,7 +640,8 @@ class ReactExoplayerView extends FrameLayout implements
         if (isFullscreen) {
             setFullscreen(false);
         }
-        audioManager.abandonAudioFocus(this);
+        //TODO: Change for auto play/pause when call detected.
+        //audioManager.abandonAudioFocus(this);
     }
 
     private void updateResumePosition() {
@@ -676,12 +683,21 @@ class ReactExoplayerView extends FrameLayout implements
 
     @Override
     public void onAudioFocusChange(int focusChange) {
+        if(focusChange<=0) {
+            //LOSS -> PAUSE
+            pausePlayback();
+        } else {
+            //GAIN -> PLAY
+            startPlayback();
+        }
+
         switch (focusChange) {
             case AudioManager.AUDIOFOCUS_LOSS:
                 eventEmitter.audioFocusChanged(false);
                 //TODO: Resolve to not play after pause.
                 //pausePlayback();
-                audioManager.abandonAudioFocus(this);
+                //TODO: Change for auto play/pause when call detected.
+                //audioManager.abandonAudioFocus(this);
                 break;
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
                 eventEmitter.audioFocusChanged(false);
