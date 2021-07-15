@@ -733,7 +733,7 @@ class ReactExoplayerView extends FrameLayout implements
             pausePlayback();
         } else {
             //GAIN -> PLAY
-            startPlayback();
+            // startPlayback();
         }
 
         switch (focusChange) {
